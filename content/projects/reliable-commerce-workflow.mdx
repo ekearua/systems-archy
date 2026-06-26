@@ -1,0 +1,79 @@
+---
+title: Reliable Commerce Workflow
+summary: Transaction consistency across payment verification, order creation, shopping bag recovery, and user-facing status updates.
+year: 2025
+tags:
+  - Paystack
+  - FastAPI
+  - Flutter
+  - Commerce
+featured: true
+caseStudy: true
+role: Payments / Backend Architecture
+metrics:
+  - label: Checkout
+    value: Backend-led
+  - label: Recovery
+    value: Redirect-safe
+  - label: Orders
+    value: Snapshot-backed
+---
+
+## Challenge
+
+Maintain transaction consistency across payment verification, order creation, shopping bag recovery, and user-facing status updates.
+
+## Solution
+
+Implemented backend-driven commerce workflows where transaction state is verified, persisted, and synchronized before client updates occur.
+
+## Focus
+
+- Payments
+- Order management
+- Commerce systems
+- Backend architecture
+
+## Overview
+
+Designed commerce and payment workflows focused on reliable checkout, transaction consistency, order recovery, and synchronization between Paystack, backend services, and the Flutter UI.
+
+The system treats payment as a stateful backend workflow, not just a redirect to a provider. Checkout begins with a server-created order, captures a shopping bag snapshot, sends the user through Paystack, verifies the transaction, then updates order state and client-facing views from persisted backend records.
+
+## System flow
+
+1. Checkout
+2. Payment provider
+3. Verification
+4. Order state
+5. Persistence
+6. Client update
+
+## Implementation detail
+
+The backend payment core is implemented in `service.py`, where checkout creates an initialized `PaymentOrder` with a Paystack reference, amount, currency, user, event, shipping details, billing snapshot, and `bag_snapshot`.
+
+The order model in `models.py` stores the transaction reference as a unique indexed value, alongside order status, paid state, Paystack authorization metadata, billing profile snapshot, shipping details, and the shopping bag snapshot. This makes the order recoverable even after payment redirects, app restarts, or provider callbacks.
+
+The Paystack integration includes both direct verification and webhook handling. Webhook handling validates the Paystack signature, resolves the order by reference, deduplicates provider events using `provider_event_key`, updates payment and order state, records timeline entries, and moves successful payments into processing.
+
+The shopping bag architecture supports reliability by using server-side `ShoppingBag`, `ShoppingBagItem`, and `ShoppingBagSelection` records. Bag items have dedupe keys, and selections can be restored across devices. During checkout, the Flutter client sends a structured `bag_snapshot` containing selected items and selected outfits, so the backend can preserve exactly what the user paid for.
+
+On the Flutter side, `payment_remote_data_source.dart` builds the Paystack initialization payload, including shipping details and bag snapshots, then calls `/api/payments/paystack/initialize`. It later verifies payments through `/api/payments/paystack/verify/{reference}` and maps backend order status into UI-facing payment and tracking models.
+
+## Engineering focus
+
+- Paystack checkout initialization.
+- Payment verification by transaction reference.
+- Webhook signature validation.
+- Order lifecycle management.
+- Shopping bag snapshot persistence.
+- Transaction and webhook idempotency.
+- Dedupe keys for cart items and provider events.
+- Order timeline and history tracking.
+- Failure recovery after redirects or app restarts.
+- Backend-driven client synchronization.
+
+## Outcome
+
+The result is a commerce flow that can recover from interrupted checkouts, duplicate provider callbacks, repeated cart actions, and app restarts. Orders remain traceable by Paystack reference, purchased items remain preserved through bag snapshots, and the Flutter UI can refresh from backend order state instead of relying only on transient client memory.

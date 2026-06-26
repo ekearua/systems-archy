@@ -1,0 +1,40 @@
+---
+title: AI-Powered Personalization Systems
+summary: Context-aware outfit recommendations combining profile signals, event classification, weather, cultural rules, embeddings, confidence bands, and deterministic fallback.
+year: 2025
+tags:
+  - FastAPI
+  - Flutter
+  - Embeddings
+  - Rule Engine
+featured: true
+role: Personalization Architecture
+metrics:
+  - label: Inputs
+    value: Multi-context
+  - label: Matching
+    value: Hybrid
+  - label: Recovery
+    value: Snapshot-backed
+---
+
+## System overview
+
+This system generates event-ready outfit recommendations from user preferences, event context, weather conditions, cultural considerations, available inventory, and learned style affinity.
+
+The implementation is deliberately hybrid. Classification rules establish stable event, formality, time, and cultural context. Embeddings resolve the closest recommendation concept. Metadata scoring ranks inventory. A culture-aware composer assembles complete outfits, while confidence bands determine how much variation or fallback is appropriate.
+
+## Core implementation
+
+- `classify_event_v5` applies active classification and cultural override rules.
+- `resolve_weather_for_event` resolves location-aware forecasts with cached fallback data.
+- `resolve_concept` compares OpenAI-generated embeddings with stored concept embeddings.
+- `score_item_v4` evaluates inventory against context and user preference signals.
+- `OutfitComposerV4` builds culture-aware outfits from ranked candidates.
+- `compute_confidence_band` controls blending, randomness, and fallback behavior.
+- `SuggestedOutfitSnapshot` persists generated recommendations for recovery.
+- `OutfitDataBloc` presents async generation, rationale, weather, shuffle, accept, and reject flows.
+
+## Reliability approach
+
+The system does not depend on one probabilistic result. Missing embeddings, incomplete profiles, unavailable weather, low-confidence matches, and exhausted candidate groups all have explicit fallback paths. The outcome is explainable recommendation behavior that can remain useful during cold start and partial-data conditions.

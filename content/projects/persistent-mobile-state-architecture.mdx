@@ -1,0 +1,80 @@
+---
+title: Persistent Mobile State Architecture
+summary: User decisions preserved across interrupted sessions, application restarts, offline gaps, and device transitions.
+year: 2025
+tags:
+  - FastAPI
+  - Flutter
+  - SQLite
+  - State Recovery
+featured: true
+caseStudy: true
+role: State Management / Mobile Architecture
+metrics:
+  - label: Authority
+    value: Backend-first
+  - label: Recovery
+    value: Session-safe
+  - label: Sync
+    value: Replay-aware
+---
+
+## Challenge
+
+Ensure user decisions remain available after interrupted sessions, application restarts, and device transitions.
+
+## Solution
+
+Implemented backend snapshots, synchronization workflows, and recovery mechanisms that restore state from persisted backend truth.
+
+## Focus
+
+- State management
+- Persistence
+- Synchronization
+- Mobile architecture
+
+## Overview
+
+Designed backend-driven state management systems that keep outfit, shopping bag, and user workflow state reliable across sessions, devices, and interrupted mobile journeys.
+
+The architecture treats the backend as the source of truth while allowing the Flutter app to remain responsive through local caches, pending operation queues, hydration flows, and recovery logic. This is especially important for flows like accepting an outfit, restoring suggested looks, recovering shopping bag selections, resuming checkout, and syncing after offline or interrupted activity.
+
+## System flow
+
+1. User action
+2. Backend persistence
+3. State snapshot
+4. Session recovery
+5. Client synchronization
+6. UI update
+
+## Implementation detail
+
+The backend stores suggested outfit state using `SuggestedOutfitSnapshot`, with a unique user and event snapshot so the app can restore recommendations after app restarts or cross-device usage. Accepted and rejected outfit decisions are tracked through `OutfitDecisionState`, preventing conflicting actions across devices and ensuring the server remains authoritative.
+
+In the outfit service, accepted and rejected mutations update both the decision state and the saved outfit snapshots, so the mobile client receives a consistent view after refresh or recovery. This supports reliable flows for accepted outfits, rejected outfits, current suggestions, and event-linked outfit history.
+
+On the Flutter side, `SplashPage` performs startup recovery by fetching saved shopping bag selections, merging them back into the active server bag, then hydrating the local bag cache from the backend. It also primes outfit state by loading cached outfits first, then enriching the UI with accepted outfits and user events with outfit snapshots.
+
+The shopping bag system uses a local secure store for responsive UX and pending operations, while the payment repository flushes pending bag operations to the backend before fetching the active bag. This allows the app to recover saved selections and keep the local bag aligned with backend state.
+
+Offline and interrupted workflows are supported through an outbox replay worker. Mutations are queued locally, replayed when connectivity returns, and completed or dropped based on server responses such as success or conflict.
+
+## Engineering focus
+
+- Backend as source of truth.
+- Outfit snapshot persistence.
+- Accepted and rejected outfit decision state.
+- Shopping bag recovery.
+- Session restoration.
+- Mobile cache hydration.
+- Pending operation replay.
+- Offline resilience.
+- Cross-device consistency.
+- Conflict-aware mutation handling.
+- Backend-driven UI synchronization.
+
+## Outcome
+
+The result is a mobile state system that preserves user intent even when the app restarts, connectivity drops, or the user switches devices. Outfit recommendations, accepted looks, shopping bag selections, and checkout-related state can be restored from backend snapshots while the Flutter client stays fast through local caching and staged hydration.

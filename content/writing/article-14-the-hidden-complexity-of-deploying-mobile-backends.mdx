@@ -1,0 +1,88 @@
+---
+title: The Hidden Complexity of Deploying Mobile Backends
+summary: Deploying mobile backends means coordinating startup behavior, migrations, schedulers, caching, dependencies, and stable client-facing contracts.
+publishedAt: 2026-03-27
+tags:
+  - Deployment
+  - FastAPI
+  - Render
+  - Mobile Backend
+featured: false
+---
+
+Deploying a mobile backend is rarely just "push the API."
+
+A mobile backend has to survive slow starts, old app versions, background jobs, external providers, database migrations, caching, secrets, and platform-specific hosting constraints.
+
+The NaijaDNA backend is a good example. It is a FastAPI service backed by Postgres, SQLAlchemy async sessions, Alembic migrations, scheduled ingestion, optional RSS or API providers, Upstash Redis response caching, email, push notifications, LiveKit integration, and mobile clients that expect stable endpoints.
+
+The README includes Render deployment notes because dependency management itself became a production concern. If the Render build command uses `uv sync`, runtime commands need to run through `uv run`. If the service uses pip, scripts should use plain `python`. Mixing those patterns can lead to production errors like missing SQLAlchemy even though dependencies exist in the repo.
+
+That is not glamorous engineering, but it is real engineering. Deployment is where small inconsistencies become outages.
+
+The backend startup sequence shows the complexity:
+
+```text
+Load Settings
+    -> Create Database Engine
+    -> Initialize Services
+    -> Start Redis Cache Client
+    -> Initialize Source Registry
+    -> Initialize Poll and News Defaults
+    -> Configure Ingestion Pipeline
+    -> Optionally Run Startup Ingestion
+    -> Start Scheduler
+    -> Serve Requests
+```
+
+A naive backend might run ingestion synchronously during startup. This project avoids that trap. Startup ingestion runs in a detached task with a timeout guard, so the API can become healthy even if an upstream feed is slow or unreachable.
+
+That design matters on platforms like Render, where deploy health checks and boot timing can decide whether a service is considered live.
+
+The scheduler also has production-aware settings:
+
+- `max_instances=1` prevents overlapping jobs.
+- `coalesce=True` avoids piling up missed runs.
+- `misfire_grace_time` bounds delayed execution.
+- The ingestion service has a run lock to reject overlapping runs.
+
+These choices exist because scheduled jobs are dangerous when deployed casually. Two overlapping ingestion runs can duplicate work, distort metrics, pressure memory, and compete for database connections.
+
+Postgres adds another deployment layer.
+
+The app uses async SQLAlchemy with `pool_pre_ping`, which helps avoid dead database connections in long-running deployed services. Alembic reads the same database URL setting as the app, so migrations can target the configured environment.
+
+Redis adds a different layer.
+
+The response cache service uses Upstash Redis over REST. It caches JSON responses with TTLs and tracks diagnostics such as reads, hits, misses, writes, errors, and namespace versions. Cache failures are logged and treated as non-fatal. That is the correct reliability posture: Redis should make common reads faster, not take down the news feed if it is temporarily unavailable.
+
+The mobile client adds one more layer.
+
+Once an app is installed, old versions remain in the wild. Backend endpoints cannot be changed casually. Feeds, categories, article detail, comments, personalization, and auth all need stable request and response shapes. Deployment mistakes are not limited to server logs; they become broken mobile sessions.
+
+The infrastructure lesson is:
+
+```text
+Render runs the process.
+Postgres preserves truth.
+Alembic evolves schema.
+Redis protects read latency.
+Schedulers keep data fresh.
+Mobile clients depend on stability.
+```
+
+The hidden complexity is coordination.
+
+Every deployment asks:
+
+- Are dependencies installed in the same environment that runs the process?
+- Has the database been migrated?
+- Can the app start if ingestion is slow?
+- Can scheduled jobs overlap?
+- Can Redis fail without breaking feeds?
+- Are environment variables complete?
+- Will old mobile clients still understand the API?
+
+A backend is not production-ready because it runs locally.
+
+It is production-ready when it can boot, migrate, fetch, cache, fail partially, recover, and keep serving mobile clients under imperfect conditions.

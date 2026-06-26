@@ -1,0 +1,47 @@
+---
+title: Building Recommendation Systems for Real Users
+summary: Designing personalization systems that remain useful despite incomplete preferences, vague inputs, conflicting signals, and cold-start users.
+publishedAt: 2026-03-07
+tags:
+  - Personalization
+  - Recommendations
+  - UX
+  - Resilience
+featured: true
+---
+
+Recommendation systems are easier to design when users are perfect.
+
+Real users are not.
+
+They skip onboarding questions. They change their minds. They have conflicting preferences. They describe events vaguely. They may like bold colors but avoid loud outfits. They may want comfort but also want something formal. They may be new to the app, leaving the system with almost no interaction history.
+
+The Event-to-Outfit platform is built around that reality.
+
+The Flutter onboarding flow collects useful preference data: preferred styles, free-form preferences, color likes, color avoids, comfort level, modesty, heel avoidance, supportive shoe needs, budget range, sustainability preference, and willingness to try new styles.
+
+But the backend cannot assume all of that data will be complete.
+
+That is why the recommendation engine uses layered signals instead of a single dependency. If user preference data is thin, event context still helps. If event text is vague, weather and formality rules still contribute. If embeddings are unavailable, fallback concepts can be used. If style affinity is missing, the user is treated as a cold-start profile.
+
+The backend scoring function, `score_item_v4`, is a good example of this. It does not need one perfect signal. It adds and subtracts score across many signals: culture, region, formality, premium context, weather, temperature, fabric, patterns, colors, occasion tags, user style preferences, learned style affinity, modesty, footwear constraints, budget, sustainability, and comfort.
+
+This makes the system resilient.
+
+A missing color preference does not break the recommendation. A missing style affinity does not stop outfit generation. A vague event does not prevent the system from producing a usable result.
+
+Real users also create conflicts. For example, a user might prefer expressive outfits but also choose conservative modesty. They might like a style category but avoid the colors most common in that category. They might choose a high-formality event but prefer comfort and supportive shoes.
+
+The solution is not to pick one preference and ignore the rest. The solution is to score across competing signals and let the final recommendation represent a tradeoff.
+
+That is where rule engines and scoring functions become more practical than purely generative output. A model can generate a nice answer, but a scoring system can make the tradeoffs visible and adjustable.
+
+The platform also learns from user actions. Acceptance and rejection flows update decision state and can reinforce style affinity over time. This lets the system move from cold-start behavior toward stronger personalization.
+
+The mobile architecture supports this as well. The Flutter app caches outfit responses, accepted outfits, featured outfits, and generation job state. That means user-facing state can survive app restarts and refreshes while the backend remains authoritative.
+
+The larger lesson is that recommendation systems for real users need humility.
+
+They need to assume data will be incomplete. They need fallback behavior. They need to handle contradictions. They need to improve with feedback. They need to explain enough of the result that users trust the recommendation.
+
+The Event-to-Outfit platform treats personalization as a progressive system rather than a one-time prediction. It gets better as it learns, but it is designed to remain useful even before it knows much.

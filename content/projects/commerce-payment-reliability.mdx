@@ -1,0 +1,41 @@
+---
+title: Commerce & Payment Reliability
+summary: Backend-led Paystack checkout with persisted bag snapshots, transaction verification, webhook idempotency, order lifecycle tracking, and mobile recovery.
+year: 2025
+tags:
+  - Paystack
+  - FastAPI
+  - Flutter
+  - Idempotency
+featured: true
+role: Commerce Architecture
+metrics:
+  - label: Checkout
+    value: Order-first
+  - label: Provider
+    value: Verified
+  - label: Events
+    value: Deduplicated
+---
+
+## System overview
+
+The commerce workflow treats checkout as a persistent backend transaction rather than a temporary client redirect.
+
+Before Paystack opens, the Flutter client sends a structured bag snapshot containing selected items, selected outfits, totals, currency, and shipping information. The backend creates or reuses a pending order, initializes the provider session, and returns authorization metadata. Final status is reconciled through direct verification and signed webhook events.
+
+## Core implementation
+
+- `payment_remote_data_source.dart` creates the checkout payload and requests Paystack initialization.
+- `_stable_checkout_guard_key` identifies equivalent checkout attempts.
+- `PaymentOrder` stores the unique reference, order state, provider metadata, shipping data, and bag snapshot.
+- `create_initialized_order` persists the pending transaction before provider redirection.
+- `verify_paystack_payment` verifies the reference from the backend.
+- `handle_paystack_webhook` validates the Paystack HMAC signature.
+- `provider_event_key` prevents duplicate webhook processing.
+- `OrderTimelineEntry` preserves an auditable lifecycle.
+- Successful reconciliation clears purchased bag items and saved selections before the client refreshes order truth.
+
+## Reliability approach
+
+The client never becomes the final authority for payment success. Redirect completion, direct verification, webhook delivery, order persistence, and client refresh are separate stages. This keeps delayed callbacks, duplicate events, app restarts, and ambiguous provider states recoverable.

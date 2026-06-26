@@ -1,0 +1,59 @@
+---
+title: Backend Verification vs Client Confirmation
+summary: Why client UX can acknowledge payment progress while backend verification remains the authority for financial truth and order state.
+publishedAt: 2026-03-17
+tags:
+  - Payments
+  - Verification
+  - Backend
+  - Mobile
+featured: true
+---
+
+The client can tell you what the user saw.
+
+The backend should tell you what actually happened.
+
+That distinction is critical in payment systems.
+
+In the Event-to-Outfit platform, the Flutter app integrates with Paystack checkout, but the backend remains responsible for verifying and persisting payment state. This is not about distrusting the client in an abstract way. It is about recognizing the limits of client-side confirmation.
+
+A mobile client can be interrupted. It can lose network. It can receive a redirect result that the backend has not processed. It can show a success page while the provider transaction is still pending. It can be closed before it makes a verification request.
+
+So the system should not treat client confirmation as final.
+
+The backend payment flow creates an initialized order before checkout begins. That order is stored in `payment_orders` with a unique Paystack reference. The Flutter app receives the reference and authorization URL, but the durable transaction record already exists on the backend.
+
+After payment, the Flutter app can call the verify endpoint using the reference. The backend then communicates with Paystack, checks the provider response, updates the order, and returns a verification result.
+
+The backend also processes Paystack webhooks. This is important because webhooks may arrive even if the client never returns. The webhook handler validates the Paystack signature using HMAC, extracts the transaction reference, loads the matching order, deduplicates the provider event, and updates the order state.
+
+This gives the system two recovery paths:
+
+- Client-initiated verification
+- Provider-initiated webhook confirmation
+
+Both lead back to backend persistence.
+
+The important design principle is this:
+
+```text
+Client confirmation can improve UX.
+Backend verification controls truth.
+```
+
+The client can say, "We are checking your payment." It can say, "Payment appears successful." It can move the user to a callback screen. But the backend should decide when an order becomes paid, processing, failed, cancelled, or refunded.
+
+This does not need to sound dogmatic. It is not "never trust the client" as a slogan. A more practical framing is: trust the client for user interaction, not financial finality.
+
+In this project, that separation shows up across several reliability mechanisms.
+
+The backend stores the order reference uniquely, so the same Paystack transaction maps to one order. It stores bag snapshots, so the purchased items remain stable. It records order timeline entries, so state transitions are traceable. It deduplicates provider events, so repeated webhooks do not double-process the order.
+
+The Flutter frontend consumes backend status through payment verification, order status, order detail, payment history, and order tracking flows. That means the UI becomes a projection of backend state instead of a fragile local assumption.
+
+This architecture is especially valuable in mobile commerce because payment flows often leave the app. Once the user enters a browser, provider page, or external payment surface, the app no longer fully controls the session. Backend verification is the way to regain consistency.
+
+The lesson is simple: payment UX starts on the client, but payment truth belongs on the backend.
+
+That is how you build a checkout system that can survive redirects, delayed callbacks, app restarts, and provider retries.

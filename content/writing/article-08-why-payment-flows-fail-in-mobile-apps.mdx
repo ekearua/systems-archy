@@ -1,0 +1,61 @@
+---
+title: Why Payment Flows Fail in Mobile Apps
+summary: A backend-driven approach to payment reliability that handles redirects, duplicate actions, delayed callbacks, and shopping bag snapshots safely.
+publishedAt: 2026-03-15
+tags:
+  - Payments
+  - Mobile
+  - Paystack
+  - Reliability
+featured: true
+---
+
+Payment flows fail in mobile apps because there are usually three versions of the truth.
+
+The client has one version.
+
+The payment provider has another.
+
+The backend has the version that should matter.
+
+A user may see a success screen from a payment provider while the backend still has an order marked as pending. A webhook may arrive late. A verification request may fail. The app may close during redirect. The user may tap checkout twice. The payment provider may retry the same event.
+
+These are normal commerce problems.
+
+The Event-to-Outfit platform handles them by making payment state backend-driven.
+
+The backend payment service creates a `PaymentOrder` before the user leaves for Paystack. That order stores a unique reference, amount, currency, user id, event id, order status, paid flag, provider access code, authorization URL, billing snapshot, shipping details, and bag snapshot.
+
+This matters because the transaction now has a durable backend identity before the provider redirect happens.
+
+The Flutter app calls `/api/payments/paystack/initialize`, receives an authorization URL and reference, then sends the user through the Paystack flow. After that, the app can verify the transaction through `/api/payments/paystack/verify/{reference}`.
+
+But the system does not depend only on the client returning.
+
+The backend also handles Paystack webhooks. It validates the webhook signature, extracts the transaction reference, finds the order, deduplicates the provider event, and updates order state. If the payment is successful, the order moves into paid or processing state and timeline entries are recorded.
+
+This protects against a common failure: the client thinks payment succeeded, but the backend never confirmed it.
+
+In a reliable commerce system, the client should not be the final authority on payment success. The client can display progress, guide the user, and initiate verification. But the backend should verify the transaction with the provider and persist the result.
+
+Another common failure is duplicate actions. A user taps checkout twice or retries after a network delay. The backend payment service uses checkout dedupe logic and stable guard keys based on user, event, amount, currency, bag snapshot, and shipping details. Shopping bag items also use dedupe keys so repeated additions do not create inconsistent cart state.
+
+Provider callbacks can also be duplicated. Paystack or any payment provider may retry webhook delivery. The backend handles this by storing unique provider event keys in order timeline entries. If the same provider event arrives again, the system can acknowledge it without applying the update twice.
+
+The bag snapshot is another reliability measure. At checkout time, the frontend sends a structured snapshot of selected items and outfits. The backend stores it on the order. This ensures the order can still show what the user paid for even if the shopping bag changes later.
+
+Payment flows fail when systems rely on temporary client memory, assume provider redirects always return, or treat success screens as final proof.
+
+The safer pattern is:
+
+```text
+Create order first
+    -> Send user to provider
+    -> Verify with provider
+    -> Persist backend state
+    -> Update client from backend state
+```
+
+That is the pattern used in this project.
+
+The main lesson is that mobile payments should be designed for uncertainty. Redirects can be interrupted. Webhooks can be delayed. Users can retry. Providers can send duplicate events. A reliable backend turns those messy events into one consistent order state.

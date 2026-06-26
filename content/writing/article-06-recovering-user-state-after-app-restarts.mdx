@@ -1,0 +1,64 @@
+---
+title: Recovering User State After App Restarts
+summary: Startup recovery architecture for shopping bag selections, outfit snapshots, accepted looks, generation jobs, and staged mobile hydration.
+publishedAt: 2026-03-11
+tags:
+  - Mobile Recovery
+  - Flutter
+  - Persistence
+  - UX
+featured: true
+---
+
+A user should be able to leave an app and come back without feeling like the product forgot them.
+
+That sounds simple, but it requires deliberate architecture.
+
+In the Event-to-Outfit platform, app restart recovery is handled across outfit state, accepted looks, shopping bag selections, checkout state, and weather/location context.
+
+The recovery flow begins in the Flutter `SplashPage`. This page does more than show a loading screen. It restores the working state of the app.
+
+One important recovery path is shopping bag restoration.
+
+On startup, the app calls the payment repository to fetch saved shopping bag selections from the backend. If saved selections exist, the app merges them into the active server bag. After that, it fetches the active server bag and hydrates the local shopping bag cache.
+
+This means the user can return after app data loss, app restart, or device transition and still recover the selections they intended to purchase.
+
+The flow looks like this:
+
+```text
+App Starts
+    -> Fetch saved server selections
+    -> Merge into active backend bag
+    -> Fetch active backend bag
+    -> Hydrate local bag cache
+    -> Continue user session
+```
+
+Outfit recovery follows a similar pattern.
+
+The app first loads cached outfits so the UI can render quickly. Then it loads accepted outfits, user events with outfit snapshots, and purges expired outfits. This staged hydration is important because it avoids a blank experience while still bringing the client back into sync with backend state.
+
+The backend supports this through persisted `SuggestedOutfitSnapshot` records. Each snapshot keeps the event and outfit payload needed to restore the user's recommendation state. Accepted outfits are persisted through backend outfit and decision records, so they can be fetched independently of temporary UI state.
+
+The system also handles generation jobs. The Flutter local database includes `outfit_generation_jobs`, with fields for job id, status, progress, partial options, queue position, cache hits, and session recovery flags. This allows the app to reason about long-running outfit generation flows even if the user leaves and returns.
+
+Recovery is not just about storing data. It is about choosing what should be restored and in what order.
+
+In this project, the startup sequence prioritizes practical user experience:
+
+1. Restore essential profile and auth state.
+2. Warm location in the background.
+3. Recover shopping bag selections.
+4. Hydrate local bag cache from the backend.
+5. Load cached outfits for immediate UI.
+6. Enrich with accepted outfits and server event snapshots.
+7. Continue into the main app.
+
+This is the kind of detail that separates a demo from a product.
+
+Without recovery architecture, mobile users hit frustrating edge cases. They accept an outfit, close the app, return later, and the accepted look is gone. They add something to a bag, get interrupted, and the cart is empty. They start checkout, switch apps, and cannot recover where they were.
+
+The Event-to-Outfit platform avoids that by treating app startup as a synchronization phase, not just an animation.
+
+The main lesson is that recovery should be designed as a first-class workflow. If the user leaves and returns later, everything important should still work.

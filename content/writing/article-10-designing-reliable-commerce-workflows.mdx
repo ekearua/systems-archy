@@ -1,0 +1,69 @@
+---
+title: Designing Reliable Commerce Workflows
+summary: End-to-end commerce architecture spanning bag state, checkout snapshots, payment verification, order lifecycle transitions, and recovery after interruptions.
+publishedAt: 2026-03-19
+tags:
+  - Commerce
+  - Payments
+  - Orders
+  - Recovery
+featured: true
+---
+
+Reliable commerce is not one feature.
+
+It is a chain.
+
+```text
+Cart
+    -> Checkout
+    -> Payment
+    -> Verification
+    -> Order
+    -> Recovery
+```
+
+If any link in that chain is weak, users lose trust.
+
+The Event-to-Outfit platform treats commerce as an end-to-end backend-driven workflow. The system includes shopping bag state, saved selections, Paystack checkout, order persistence, payment verification, webhook handling, order history, and order tracking.
+
+The shopping bag architecture starts with user intent. A user selects an outfit or design and adds it to the bag. The backend stores active shopping bag items, while the Flutter app keeps a local cache for responsiveness. Bag items include source type, event id, outfit id, item ids, amount, quantity, currency, and summary snapshots.
+
+Dedupe keys are used to avoid duplicate bag items when the same selection is added more than once. This is important because mobile users tap repeatedly, retry after loading states, or return to the same item later.
+
+The platform also persists `ShoppingBagSelection` records. These are server-side saved outfit selections used for device recovery. If the app restarts or local data is cleared, the client can fetch saved selections and merge them back into the active server bag.
+
+Checkout begins only after the system has enough state to preserve the transaction. The Flutter client builds a structured checkout payload with selected bag items, selected outfits, amount, currency, shipping details, and a bag snapshot. The backend creates a `PaymentOrder` before redirecting the user to Paystack.
+
+That order snapshot is critical. The shopping bag may change later, but the order still needs to represent exactly what the user attempted to buy. The `bag_snapshot` preserves that.
+
+After payment, the system verifies transaction state through Paystack verification and webhook handling. The backend updates the order status, paid flag, payment method metadata, and timeline entries. If payment succeeds, the order can move into processing. If a webhook arrives twice, provider event deduplication prevents repeated processing.
+
+Order state is then exposed back to the client. The Flutter app has flows for payment history, order status, order details, order tracking, purchased looks, and checkout success. These views are backed by persisted backend state, not just local checkout memory.
+
+The reliability pattern is:
+
+1. Persist user selections.
+2. Preserve a checkout snapshot.
+3. Create an order before provider redirect.
+4. Verify payment on the backend.
+5. Deduplicate provider events.
+6. Update order lifecycle state.
+7. Sync the client from backend truth.
+8. Recover shopping bag and order state after interruptions.
+
+This architecture handles the real problems of commerce systems:
+
+- App closes during checkout.
+- Provider callback arrives late.
+- User retries payment.
+- Cart item is added twice.
+- Client thinks payment succeeded before backend verification.
+- User returns on another device.
+- Order history needs to show what was actually purchased.
+
+The Event-to-Outfit platform solves these by treating commerce state as durable backend state with mobile synchronization layered on top.
+
+The takeaway is that reliable commerce is not just about integrating a payment provider. It is about designing the full lifecycle around consistency, recovery, and traceability.
+
+Payments move money. Commerce architecture preserves trust.

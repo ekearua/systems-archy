@@ -1,0 +1,50 @@
+---
+title: Backend State Should Be the Source of Truth
+summary: Why durable backend persistence matters more than temporary client memory for recommendations, shopping bag state, checkout continuity, and cross-device recovery.
+publishedAt: 2026-03-09
+tags:
+  - State Management
+  - Backend
+  - Flutter
+  - Recovery
+featured: true
+---
+
+Mobile apps feel fast because they keep state on the client.
+
+But serious mobile apps remain reliable because the backend is the source of truth.
+
+The Event-to-Outfit platform uses this principle across outfit recommendations, accepted outfits, shopping bag selections, checkout state, and session recovery.
+
+Client state is useful. It makes the UI responsive. It allows screens to render immediately. It helps the app survive poor connectivity. But client state is not authoritative. A user can reinstall the app, switch devices, lose local cache, or perform the same action from another session.
+
+That is why backend state wins.
+
+In the backend, suggested outfits are persisted through `SuggestedOutfitSnapshot` in `api/outfits/outfit_models.py`. This table keeps a unique snapshot per user and event. When the system generates or shuffles outfit options, the backend can persist the event snapshot and outfit payload so the recommendation can be recovered later.
+
+Accepted and rejected outfit decisions are stored separately through `OutfitDecisionState`. This matters because accepting an outfit is not just a UI action. It is a durable decision. If the same outfit is accepted on one device and rejected on another, the backend needs to resolve that conflict consistently.
+
+The outfit service handles this by updating decision state and then persisting the mutation back into outfit snapshots. That way, restored recommendations reflect the user's latest durable decision.
+
+The Flutter app still uses local storage. `OutfitDataBloc` loads cached outfits first so the interface has something to show quickly. Then it enriches state by fetching accepted outfits and event-linked outfit snapshots from the backend.
+
+This gives the user the best of both worlds:
+
+- Fast local rendering
+- Backend truth for durable state
+- Recovery after app restart
+- Consistency across devices
+
+The same pattern appears in shopping bag recovery. The Flutter app keeps local selections for responsiveness, but the backend stores shopping bag selections and active bag items. On startup, `SplashPage` fetches saved selections, merges them into the active server bag, and then hydrates the local cache from the backend.
+
+That startup flow is important. It means the local cache is not blindly trusted. The app uses it as a convenience layer, then reconciles with the backend.
+
+This is the core architectural lesson: client state is a cache, not the truth.
+
+There are exceptions, of course. Some UI-only state can live entirely on the client. But anything that represents user intent, payment state, accepted decisions, order state, or cross-session continuity should be persisted on the backend.
+
+Backend truth also improves debugging. If something goes wrong, engineers can inspect persisted orders, outfit snapshots, mutation records, accepted outfit state, and shopping bag records. Without backend truth, the only evidence may be whatever happened to exist in one user's local device state.
+
+The Event-to-Outfit platform treats backend state as the system of record and Flutter state as a synchronized view.
+
+That is the right tradeoff for mobile systems where users expect the app to remember what they did, even after interruptions.

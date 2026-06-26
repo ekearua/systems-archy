@@ -1,0 +1,108 @@
+---
+title: Content Distribution & Aggregation Systems
+summary: Multi-source news ingestion and distribution across RSS, GNews, NewsAPI, curated homepage surfaces, response caching, and offline-capable Flutter feed delivery.
+year: 2025
+tags:
+  - FastAPI
+  - Flutter
+  - RSS
+  - Aggregation
+featured: true
+role: Feed & Distribution Architecture
+metrics:
+  - label: Sources
+    value: Multi-provider
+  - label: Delivery
+    value: Cache-backed
+  - label: Sync
+    value: Offline-safe
+---
+
+## Overview
+
+Designed a content aggregation and distribution system that pulls news from multiple upstream providers, normalizes it into a canonical article model, deduplicates overlapping stories, and redistributes it into curated top stories, latest stories, category sections, secondary chips, personalized feeds, and mobile-friendly cached views.
+
+The backend treats aggregation and distribution as separate responsibilities. Ingestion pulls from RSS and API providers, enriches and deduplicates the incoming inventory, and persists stable article records. Distribution then assembles homepage placements, fallback autofill sections, freshness-aware top stories, and country-specific feed variants from that stored inventory. The Flutter client consumes those feeds through remote and local data sources so the app remains responsive online and usable offline.
+
+## Challenge
+
+Turn unreliable external provider data into a dependable product feed without letting slow sources, malformed payloads, duplicate stories, or stale cache state degrade the user experience.
+
+The system had to support multiple source types, preserve editorial control over homepage surfaces, serve country-aware feeds, and keep the Flutter client useful even when connectivity or upstream providers were inconsistent.
+
+## System flow
+
+1. Source registry
+2. Provider ingestion through RSS, GNews, and NewsAPI adapters
+3. Normalization and categorization
+4. Deduplication and persistence
+5. Homepage and feed distribution
+6. Response cache
+7. Flutter remote fetch and local cache
+8. UI rendering
+
+## Solution
+
+Built a backend pipeline that separates ingestion from feed delivery. Source records are managed in a registry, provider adapters normalize incoming items into a canonical article shape, the ingestion pipeline applies retry and deduplication logic, and the distribution layer assembles top stories, latest stories, category sections, secondary chips, and personalized feeds from persisted article truth.
+
+The mobile app then consumes those backend-composed feed surfaces while caching top and latest slices locally by bucket, category, and country. That keeps feed delivery resilient without pushing source-level complexity into the client.
+
+## Engineering focus
+
+- Multi-source news aggregation.
+- Canonical article normalization.
+- Source registry and provider controls.
+- RSS conditional fetching with `ETag` and `Last-Modified`.
+- Scheduled and manual ingestion orchestration.
+- Deduplication and provider preference resolution.
+- Homepage placement plus autofill distribution logic.
+- Country-aware feed distribution.
+- Response caching and invalidation.
+- Offline-capable Flutter feed hydration.
+- Admin-controlled ingestion and homepage configuration.
+
+## Implementation detail
+
+The backend ingestion coordinator lives in `ingestion_pipeline_service.py`, where `IngestionPipelineService` wires source-specific and type-specific adapters, supports manual and scheduled ingestion, and prevents overlapping runs. Manual and scheduler-triggered runs share the same runtime path so operational controls and run metrics stay consistent.
+
+RSS aggregation is implemented in `rss_adapter.py`, where feeds are fetched with explicit timeouts, parsed into canonical `NewsArticle` objects, categorized, tagged, and image-enriched. The adapter also persists `ETag` and `Last-Modified` headers so future runs can issue conditional requests and skip unchanged feeds instead of redownloading the full payload.
+
+Source management is backed by Postgres through `source_registry_service.py`, which initializes the default source catalog, lists active sources, and persists per-source fetch state such as `http_etag`, `http_last_modified`, and `last_run_at`. This keeps ingestion state durable across restarts and admin changes.
+
+Canonical persistence and duplicate handling are performed in `news_service.py`, where `ingest_articles` fingerprints incoming content, merges duplicates, resolves provider preference, preserves AI categorization metadata, and decides whether newly ingested records should be auto-published for feed distribution.
+
+Homepage and feed distribution are assembled in `news_service.py` through `get_homepage_content`, which combines pinned placements with generated top stories, latest stories, category sections, and secondary chips. Supporting builders apply freshness windows, placement exclusions, category autofill, and source filters, including country-aware source selection.
+
+API response caching is handled by `response_cache_service.py`, which stores serialized feed responses in Upstash Redis with namespace versioning and TTLs. When ingestion inserts new content, the pipeline invalidates the `news` namespace so downstream consumers do not keep serving stale feed snapshots.
+
+The application bootstraps the aggregation stack in `main.py`, where response caching, source registry initialization, ingestion services, startup ingestion, and scheduled jobs are all wired together. On startup, the server can trigger an immediate ingestion run while still keeping API health independent from slow or unreachable providers.
+
+On the Flutter side, homepage and feed distribution are consumed through `news_remote_datasource.dart`, where the app requests `/news/homepage`, `/news/top`, `/news/latest`, and `/feed/personalized`. Top stories and latest stories are country-aware, and latest feed requests can switch into personalized mode for signed-in users.
+
+Local feed resilience is implemented in `news_local_datasource.dart`, which stores top and latest stories in Drift buckets keyed by country and category while preserving sort order for stable presentation. The repository layer in `news_repository_impl.dart` falls back to those cached slices when connectivity or remote fetches fail.
+
+Feed loading on the client is coordinated by `NewsBloc`, where top and latest sections are fetched independently so partial or cached content can still render. The homepage screen then hydrates backend-curated sections from `news_home_page.dart`, including top stories, latest stories, category sections, and secondary chips.
+
+Admin-side distribution controls are exposed through `admin_remote_datasource.dart`, where editors can manage sources, trigger ingestion, inspect ingestion status, and configure homepage placements, category sections, secondary chips, and freshness settings.
+
+## Why it worked
+
+The system treats content aggregation as a pipeline instead of a single fetch step:
+
+```text
+Sources
+    -> Registry
+    -> Ingestion
+    -> Normalization
+    -> Deduplication
+    -> Persistence
+    -> Cache Invalidation
+    -> Feed Delivery
+    -> Mobile Cache
+```
+
+That architecture isolates source instability from the product experience. A provider can be slow, malformed, duplicated, or temporarily unavailable without forcing the app into an empty or broken feed state.
+
+## Outcome
+
+The result is a content distribution system that does more than fetch headlines. It manages provider diversity, freshness windows, deduplication, source-level controls, curated homepage assembly, and offline-safe client delivery. News can be ingested from multiple sources, normalized into a stable backend inventory, redistributed into several feed surfaces, and served to Flutter clients with both cache-backed resilience and admin-controlled editorial structure.

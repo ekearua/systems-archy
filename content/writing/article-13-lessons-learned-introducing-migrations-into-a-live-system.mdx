@@ -1,0 +1,88 @@
+---
+title: Lessons Learned Introducing Migrations Into a Live System
+summary: Why database migrations become release events once a product has real data, background jobs, old clients, and evolving schema requirements.
+publishedAt: 2026-03-25
+tags:
+  - Alembic
+  - Postgres
+  - Migrations
+  - Backend
+featured: false
+---
+
+Introducing migrations after a product already exists is one of those engineering tasks that sounds procedural until production data is involved.
+
+The NaijaDNA backend uses Alembic with SQLAlchemy async models and Postgres. The migration history now includes dozens of revisions: the initial Postgres schema, polls, users, relationships, personalization tables, feed tags, streams, editorial workflow, comments, notifications, subscriptions, homepage configuration, live updates, ingestion jobs, AI ingestion fields, ingestion settings, article bodies, source deletion, and HTTP cache headers for news sources.
+
+That history tells a familiar story.
+
+The MVP started as a product with news, polls, categories, users, and feeds. As it grew, the schema had to support features that were not in the first version:
+
+- User accounts and roles.
+- Poll ownership and voting.
+- Saved stories and personalization.
+- Feed event tracking.
+- Editorial review.
+- Comments and moderation.
+- Homepage configuration.
+- Live updates.
+- Ingestion job observability.
+- Source-level cache headers.
+- AI classification metadata.
+
+Each new feature changed the database shape.
+
+Without migrations, those changes become risky manual operations. One developer updates models, another environment still has the old schema, production has partial columns, and the app starts failing at runtime.
+
+Alembic gives the project an ordered history.
+
+The important detail is that the Alembic environment reads the same `DATABASE_URL` setting as the application. That keeps local, staging, and production migration behavior aligned with the app configuration. The migration environment also imports the model metadata and enables type comparison, so schema drift becomes easier to detect.
+
+The migration flow becomes:
+
+```text
+Model Change
+    -> Alembic Revision
+    -> Review Generated Operations
+    -> Apply Locally
+    -> Apply to Deployed Database
+    -> Start App Against New Schema
+```
+
+The hidden challenge is sequencing.
+
+In a live system, the app and database are not abstract. Users may be reading feeds while a deployment happens. A scheduler may be ingesting content. Admins may be publishing articles. Mobile clients may be running old versions.
+
+That means migrations should be designed with compatibility in mind.
+
+A safe migration is usually additive first:
+
+- Add nullable columns before requiring them.
+- Add tables before routing traffic to them.
+- Backfill data before enforcing constraints.
+- Deploy code that can tolerate old and new states.
+- Remove old fields only after clients no longer depend on them.
+
+NaijaDNA shows why that discipline matters. Features such as ingestion settings, article bodies, source deletion, HTTP cache headers, and personalization tables all affect live workflows. A bad migration can break ingestion, feeds, admin tools, or mobile rendering.
+
+Migrations also become documentation.
+
+The revision list explains how the platform evolved. You can see when personalization was introduced, when feed tags were added, when editorial workflow arrived, when ingestion jobs became observable, and when source caching became important.
+
+That is useful for engineering leadership because a migration history is proof of product learning. The database changed because the product grew.
+
+The takeaway is simple:
+
+When an MVP becomes a real system, schema changes stop being local code changes. They become release events.
+
+Alembic does not remove the need for judgment, but it gives the team a controlled path:
+
+```text
+Change intentionally.
+Apply in order.
+Preserve data.
+Keep old clients in mind.
+Treat production schema as a contract.
+```
+
+That is the difference between adding features and safely evolving a live backend.

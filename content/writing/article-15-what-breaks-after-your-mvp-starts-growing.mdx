@@ -1,0 +1,108 @@
+---
+title: What Breaks After Your MVP Starts Growing
+summary: How persistence, background work, verification, observability, and deployment discipline replace fragile MVP assumptions as products mature.
+publishedAt: 2026-03-29
+tags:
+  - Systems Growth
+  - Reliability
+  - Observability
+  - Architecture
+featured: true
+---
+
+The first version of a product usually breaks in predictable places.
+
+State gets lost. Payments become ambiguous. Deployments become fragile. Persistence stops matching the speed of product changes.
+
+That is visible across the Event-to-Outfit platform and NaijaDNA.
+
+In the early stage, it is tempting to treat the client as the center of the product. The client has the screen, the user interaction, and the immediate state. But once users start returning across sessions, devices, payments, feeds, and interrupted workflows, local state is not enough.
+
+The Event-to-Outfit system had to persist accepted outfits, suggested outfit snapshots, shopping bag selections, checkout snapshots, payment orders, provider verification responses, and order timeline events.
+
+NaijaDNA had to persist articles, source state, feed events, hidden items, interests, comments, polls, editorial workflow, ingestion jobs, ingestion settings, and migration history.
+
+That is the first growth lesson:
+
+Your database becomes the memory of the product.
+
+The second lesson is that background work appears everywhere.
+
+For Event-to-Outfit, workflows can be interrupted by app restarts, checkout redirects, offline sessions, and provider callbacks.
+
+For NaijaDNA, background work includes RSS ingestion, scheduled feed refreshes, article queue archival, startup ingestion, response cache invalidation, and mobile sync.
+
+The MVP version of a feature might be direct:
+
+```text
+Request
+    -> Work
+    -> Response
+```
+
+The grown-up version often becomes:
+
+```text
+Request
+    -> Persist Intent
+    -> Run Background Work
+    -> Record Result
+    -> Expose Status
+    -> Let Client Recover
+```
+
+That is a different architecture.
+
+The third lesson is that external systems create uncertainty.
+
+Payment providers can say pending while the client thinks the user paid. RSS sources can time out. News APIs can rate-limit. Redis can be unavailable. Postgres connections can go stale. Mobile networks can disappear. Deployment environments can run commands outside the dependency context.
+
+Growing systems need explicit handling for those uncertainties:
+
+- Payment verification instead of client-only confirmation.
+- Webhook deduplication instead of trusting event delivery once.
+- Shopping bag recovery instead of local-only cart state.
+- RSS retries and per-source errors instead of one failed feed breaking the run.
+- Conditional RSS requests instead of redownloading unchanged feeds.
+- Cache fallbacks instead of empty mobile screens.
+- Alembic migrations instead of manual schema edits.
+- Startup timeouts instead of blocking API readiness.
+
+The fourth lesson is observability.
+
+When a system is small, the developer can reproduce most issues locally. When it grows, failures become distributed across users, sources, jobs, deployments, and providers.
+
+That is why the NaijaDNA ingestion pipeline records fetched, inserted, deduped, error, retry, AI-classification, fallback, rate-limit, and duplicate-cluster counts. It is also why the payment system records order status, verification responses, provider events, and timeline entries.
+
+You cannot fix what the system refuses to remember.
+
+The fifth lesson is that product features become contracts.
+
+Once a mobile app ships, backend routes and payloads are not private implementation details. Once payments are live, order state is not just a database row. Once ingestion is scheduled, source configuration is operational infrastructure. Once migrations are introduced, schema changes become release events.
+
+The shape of the grown system is:
+
+```text
+State
+    -> Persistence
+    -> Recovery
+    -> Verification
+    -> Deployment
+    -> Observability
+```
+
+What breaks after the MVP grows is not usually the idea.
+
+It is the assumptions:
+
+- The app will stay open.
+- The network will be available.
+- The provider will respond immediately.
+- The database already has the right shape.
+- The feed source will be valid.
+- The user will only use one device.
+- The deployment command will run in the right environment.
+
+Senior engineering is the work of replacing those assumptions with systems.
+
+That is what these projects show. The interesting engineering is not only recommendation logic, payments, RSS ingestion, or deployment. It is the connective tissue that makes those pieces reliable when real users and real infrastructure start applying pressure.

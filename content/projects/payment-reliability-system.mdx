@@ -1,0 +1,48 @@
+---
+title: Payment Reliability System
+summary: Backend-verified orchestration for mobile payment flows where confirmation, retries, and recovery need to stay intelligible under unstable networks.
+year: 2024
+tags:
+  - Flutter
+  - FastAPI
+  - PostgreSQL
+  - Redis
+featured: true
+role: Fintech Architecture
+metrics:
+  - label: Reliability
+    value: 99.999%
+  - label: Latency
+    value: <150ms
+  - label: Model
+    value: Thin client
+---
+
+## Overview
+
+Financial systems often suffer from "zombie transactions" states where a client believes a payment failed while the provider processed it, or vice versa. This system was engineered to move all critical logic away from volatile client environments into a resilient server-side state machine.
+
+## The problem
+
+The legacy architecture relied heavily on client-side callbacks to confirm payment success. That created critical vulnerabilities:
+
+- **Network Drops:** the client can lose connection during the final handshake, leaving transactions in an ambiguous state.
+- **State Fragmentation:** local database records and payment gateway truth drift apart under race conditions.
+- **Interrupted Session Recovery:** retries and reconnections become risky because the system no longer knows which side owns the latest valid state.
+
+## System architecture
+
+Transactional flow passes through idempotent request handlers and persistent state reconciliation workers. The client initiates the payment, the backend becomes the idempotent authority, the gateway performs external processing, and a verification layer keeps state synchronized.
+
+## Engineering focus
+
+- **Async Workflows:** Redis streams enable non-blocking transaction updates and background ledger reconciliation.
+- **Failure Recovery:** exponential backoff retries protect external API dependencies with circuit breaker behavior.
+- **State Sync:** a truth-arbiter service validates local database state against webhooks every five seconds.
+- **Persistent Ops:** WAL-backed transaction logs help prevent data loss even during full server restarts.
+
+## The solution: backend as authority
+
+We re-engineered the transaction lifecycle as an immutable state machine. The client is now a thin subscriber that requests a transaction and waits for a server-sent event or push notification.
+
+By implementing **idempotency keys** at the gateway entry, we ensured that even if a client retries a request multiple times, the backend only ever processes the transaction once, preventing duplicate charges.

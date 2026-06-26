@@ -1,0 +1,90 @@
+---
+title: Designing Feed Systems at Scale
+summary: Separating ingestion, editorial delivery, personalization, caching, and mobile continuity to keep feed systems relevant and predictable at scale.
+publishedAt: 2026-03-23
+tags:
+  - Feeds
+  - Personalization
+  - Caching
+  - Flutter
+featured: true
+---
+
+A feed system becomes difficult when it has to serve different users without becoming unpredictable.
+
+NaijaDNA has both editorial feed surfaces and personalized feed surfaces. That combination is important. A news app cannot rely only on personalization because users still expect shared editorial structure: top stories, latest stories, categories, country filters, and homepage placements.
+
+The backend separates those concerns.
+
+The news service owns canonical article storage and editorial delivery. It serves top stories, latest stories, homepage content, article detail, comments, article workflow, and admin publishing flows. The personalization service then layers user-specific ordering on top of published articles.
+
+This is the right boundary. The feed is not personalized at ingestion time. Ingestion creates normalized article records. Personalization happens at read time, based on the user and the current candidate set.
+
+The personalized feed uses a hybrid scoring model. It combines explicit interests, implicit behavior, freshness, trends, hidden items, seen-article penalties, category filtering, and country filtering.
+
+User behavior is stored as feed events:
+
+```text
+impression
+click
+save
+share
+discuss
+hide
+report
+dwell
+```
+
+Those events update implicit interest weights. Positive actions like saves, shares, and discussion increase preference strength. Negative actions like hide and report reduce it. The system also supports direct feedback such as more-like-this, less-like-this, hide article, hide source, hide category, follow topic, and unfollow topic.
+
+That gives the feed two kinds of memory:
+
+1. Explicit memory: what the user says they care about.
+2. Behavioral memory: what the user actually does.
+
+The personalized feed then pulls a larger candidate set than the final requested limit, scores those candidates, filters hidden items, applies freshness and trend weights, penalizes seen articles, sorts the results, and returns a limited response.
+
+The simplified scoring flow looks like this:
+
+```text
+Published Articles
+    -> Country/Category Filter
+    -> Remove Hidden Items
+    -> Preference Score
+    -> Freshness Score
+    -> Trend Score
+    -> Seen Penalty
+    -> Ranked Feed
+```
+
+The mobile app reflects this architecture. If the user is signed in, the latest feed can request `/feed/personalized`. If there is no user context, the app falls back to `/news/latest` with diversified sources. That gives anonymous users a useful feed while giving signed-in users a tailored one.
+
+The client stores feed slices locally using Drift. The cache is bucketed by top or latest, category, and country so one feed request does not overwrite another. This matters at scale because feed products are not one list. They are many lists: top stories, latest stories, category feeds, country feeds, personalized feeds, and anonymous diversified feeds.
+
+The sync layer watches connectivity and schedules refreshes through the day. When the user is offline, the app shows cached data. When the connection returns, it refreshes.
+
+At backend scale, the important constraint is not just request volume. It is freshness pressure.
+
+Feeds are expected to be current, but external sources are slow and uneven. The backend handles that with scheduled ingestion, per-source polling intervals, source grouping, bounded concurrency, retry limits, conditional RSS requests, response cache TTLs, and cache namespace invalidation after inserts.
+
+At product scale, the important constraint is relevance.
+
+The feed has to avoid three failures:
+
+1. Showing stale stories.
+2. Showing repetitive stories from the same source.
+3. Showing stories that ignore user feedback.
+
+NaijaDNA addresses those with diversified latest feeds, hidden item filtering, seen-article penalties, explicit follows, implicit interest weights, and country-aware source filtering.
+
+The larger lesson is that a scalable feed system is not only about faster queries. It is about preserving clean boundaries:
+
+```text
+Ingestion creates article truth.
+Editorial systems shape shared surfaces.
+Personalization ranks for the user.
+Caching protects latency.
+Mobile storage protects continuity.
+```
+
+That separation gives the system room to grow without turning the feed into one giant function that nobody wants to touch.

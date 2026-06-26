@@ -1,0 +1,79 @@
+---
+title: Context-Aware Recommendation Engine
+summary: Relevant outfit recommendations built from user preferences, weather conditions, event context, cultural considerations, and available inventory.
+year: 2025
+tags:
+  - FastAPI
+  - Flutter
+  - Embeddings
+  - Personalization
+featured: true
+caseStudy: true
+role: Personalization / Recommendation Systems
+metrics:
+  - label: Inputs
+    value: Multi-signal
+  - label: Matching
+    value: Embedding-led
+  - label: Delivery
+    value: Async + cached
+---
+
+## Challenge
+
+Generate relevant recommendations using user preferences, weather conditions, event context, cultural considerations, and available inventory.
+
+## Solution
+
+Built a layered recommendation architecture combining classification rules, recommendation logic, confidence scoring, and fallback mechanisms.
+
+## Focus
+
+- Personalization
+- Recommendation systems
+- Rule engines
+- AI integration
+
+## Overview
+
+Built a context-aware outfit personalization system that recommends event-ready looks using user profile signals, event context, weather data, cultural rules, and learned style affinity.
+
+The backend recommendation pipeline combines a rule-driven event classifier, concept embeddings, metadata scoring, cultural outfit composition, confidence bands, and fallback strategies. The Flutter frontend turns this into a user-facing planning experience with onboarding preferences, event-based outfit generation, weather cards, rationale overlays, accepted looks, shuffle flows, async generation progress, and local caching.
+
+## System flow
+
+1. User profile and onboarding preferences
+2. Event context including date, location, and occasion
+3. Weather resolution through geocode, forecast, and cache
+4. Rule-based classification for event, formality, culture, and time
+5. Embedding-based concept matching
+6. Item scoring and outfit composition
+7. Confidence-aware recommendation
+8. Flutter UX for outfit cards, rationale, weather, shuffle, and accept or reject flows
+
+## Engineering focus
+
+- Personalization architecture using profile, preference, and behavior signals.
+- Recommendation scoring across culture, weather, event type, formality, colors, comfort, modesty, footwear, budget, and sustainability.
+- Embedding-based concept resolution using `text-embedding-3-small` and stored concept embeddings.
+- Rule-driven classification with event, weather, time, context, formality, and cultural override rules.
+- Weather integration through location-aware forecast resolution and cached weather snapshots.
+- Confidence scoring for cold-start, warming, confident, and strong user profiles.
+- Fallback strategies for missing embeddings, low-confidence matches, async route compatibility, and cached or offline client state.
+- Flutter Bloc-driven UX for async generation, shuffle, accepted outfits, featured outfits, weather display, and local persistence.
+
+## Implementation detail
+
+The backend recommendation core lives in `outfit_engine.py`, where `score_item_v4` scores clothing items against event context, weather, culture, formality, user colors, style affinity, modesty, footwear needs, budget, sustainability, and comfort.
+
+Event classification is handled in `outfit_rules.py` through `classify_event_v5`, which reads active rule sets and returns a stable context payload for downstream recommendation. Concept matching also uses embeddings through the `concept_embeddings` table and OpenAI embeddings in the same rules layer.
+
+The Flutter frontend captures personalization inputs during onboarding, including style preferences, color likes and avoids, modesty, comfort, footwear constraints, budget, sustainability, and willingness to try new styles.
+
+The user-facing outfit experience is managed through `OutfitDataBloc`, which handles generation jobs, shuffle requests, cached outfits, accepted looks, featured outfits, and weather-enriched event views.
+
+## Outcome
+
+The result is a practical AI personalization system that does more than generate outfits. It understands the user, the occasion, the weather, and cultural expectations, then produces explainable recommendations with reliability safeguards.
+
+The system supports both confident recommendations and graceful fallback behavior, making it suitable for real-world fashion planning where user data, weather data, and event details may vary in completeness.

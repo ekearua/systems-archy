@@ -1,0 +1,74 @@
+---
+title: Building Content Aggregation Systems
+summary: A content pipeline architecture that turns inconsistent external feeds into normalized, deduplicated, cache-aware, mobile-ready product data.
+publishedAt: 2026-03-21
+tags:
+  - Aggregation
+  - RSS
+  - FastAPI
+  - Mobile Feeds
+featured: true
+---
+
+Content aggregation looks simple from the outside. You collect stories from sources, normalize them, and show them in a feed.
+
+In practice, the hard part is making unreliable external content behave like dependable product data.
+
+The NaijaDNA backend is built around that reality. Its content pipeline is not just a thin RSS reader. It has a source registry, RSS and provider adapters, ingestion jobs, retry behavior, deduplication, category inference, image enrichment, persistence, cache invalidation, and mobile delivery.
+
+The system starts with sources.
+
+Sources are not hardcoded directly into one ingestion loop. The backend uses a Postgres-backed source registry. Default sources are synchronized into the database on startup, and each source carries operational fields such as source type, country, enabled or configured state, feed URL, API base URL, polling interval, last run time, ETag, and Last-Modified headers.
+
+That matters because source management becomes an operational concern very quickly. A news platform needs to disable broken feeds, tune polling intervals, add regional feeds, and separate API-key sources from open RSS sources without redeploying every time.
+
+The RSS adapter handles the ingestion edge.
+
+For each RSS or Atom source, the adapter fetches feed bytes with explicit timeouts, follows redirects, applies request headers, and limits payload size. It also uses conditional request headers so feeds that have not changed can return `304 Not Modified` instead of forcing the platform to redownload the same payload.
+
+Once a feed is fetched, parsing is moved into a worker thread because feed parsing is blocking. That is a small engineering detail, but it matters in an async FastAPI service. Blocking work inside the event loop can make unrelated requests slower.
+
+The adapter then maps each feed entry into a canonical article object:
+
+```text
+RSS Entry
+    -> title/link/published date
+    -> category inference
+    -> summary/body cleanup
+    -> stable article id
+    -> image extraction
+    -> tags
+    -> canonical NewsArticle
+```
+
+The stable article id is built from the source id, link, title, and publish date. That gives the storage layer a consistent identity for deduplication even when sources return overlapping articles across runs.
+
+Processing continues inside the ingestion pipeline.
+
+The ingestion service coordinates source selection, adapter execution, retry handling, run metrics, persistence, and cache invalidation. It supports manual runs and scheduled runs. Scheduled ingestion does not simply hit every source every time. It groups sources into shards such as Nigerian publishers, other African publishers, UK publishers, North American publishers, API-backed sources, and other sources. That smooths out memory and network pressure.
+
+Each run records counts for fetched, inserted, deduped, failed, AI-classified, AI-fallback, rate-limited, and duplicate-clustered articles. Those metrics are important because aggregation systems fail quietly. Without run-level visibility, a product can look healthy while half the feeds have stopped producing fresh content.
+
+Delivery is the final stage.
+
+Articles are stored in Postgres and served through feed endpoints such as top stories, latest stories, homepage content, source lists, and personalized feeds. The backend also uses response caching through Upstash Redis for common response shapes like top stories, latest stories, polls, categories, and tags. When ingestion inserts new articles, the news cache namespace is invalidated.
+
+On mobile, the Flutter app keeps feed slices in a local Drift database. Top stories and latest stories are cached by bucket, category, and country. The repository reads from cache when the user is offline or when a remote request fails, so the app can still show useful content instead of collapsing into an empty state.
+
+The useful lesson from this system is that content aggregation is a pipeline, not a fetch call.
+
+```text
+Sources
+    -> Registry
+    -> Ingestion
+    -> Normalization
+    -> Deduplication
+    -> Persistence
+    -> Cache Invalidation
+    -> Feed Delivery
+    -> Mobile Cache
+```
+
+A good aggregation system accepts that external sources are inconsistent. Some feeds are slow. Some are malformed. Some repeat stories. Some omit images. Some change format. Some stop responding.
+
+The engineering goal is not to make every source perfect. The goal is to isolate source failure so the product remains useful.

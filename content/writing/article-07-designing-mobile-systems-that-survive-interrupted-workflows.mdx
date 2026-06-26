@@ -1,0 +1,64 @@
+---
+title: Designing Mobile Systems That Survive Interrupted Workflows
+summary: Durable backend state, outbox replay, async generation jobs, and recovery-first commerce flows for interruption-prone mobile usage.
+publishedAt: 2026-03-13
+tags:
+  - Mobile
+  - Reliability
+  - Replay
+  - Commerce
+featured: true
+---
+
+Mobile workflows are constantly interrupted.
+
+The user switches apps. The phone loses network. A payment redirect opens a browser. The OS kills the app in the background. A long-running request finishes after the user has left the screen. A user taps an action offline and expects it to apply later.
+
+The Event-to-Outfit platform is designed with those interruptions in mind.
+
+There are three major interruption-prone areas in the project:
+
+- Outfit generation
+- Shopping bag and checkout
+- Payment and order status
+
+Outfit generation can be long-running because it involves backend orchestration, context resolution, item scoring, outfit composition, and image and rationale generation. The backend exposes async generation routes and job status endpoints. The Flutter app starts a generation job, listens for progress updates, stores job state, and can recover partial results or final status.
+
+This protects the user from the classic mobile problem where a long-running task disappears if the app is backgrounded.
+
+Shopping bag workflows are another source of interruption. A user may add an outfit to the bag, close the app, lose network, or move to another device. The app uses local secure storage for responsive bag selections and pending operations. The backend stores shopping bag selections and active bag state for recovery.
+
+The payment repository flushes pending selection operations before reading backend bag state. This creates a synchronization boundary: before the UI trusts the current bag, it tries to apply any pending local intent.
+
+The project also includes a general outbox replay worker in `style/lib/core/replay/outbox_replay_worker.dart`. It listens for connectivity changes, drains queued mutations when the internet returns, marks successful mutations as completed, and treats conflicts or rejected client requests as completed rather than retrying forever.
+
+That last point matters. A good replay system should not blindly retry every failed action. If the backend says a decision conflicts with current truth, the client needs to stop replaying and reconcile.
+
+Payment is the most sensitive interruption point. Users often leave the app during checkout because they are redirected to a provider. The backend protects this flow by creating an initialized order before the provider redirect. The order stores the Paystack reference, amount, currency, user, event, shipping details, billing snapshot, and bag snapshot.
+
+That means the system can recover even if the client disappears after checkout starts.
+
+The architecture follows this principle:
+
+```text
+Do not wait for the client to remember critical state.
+Persist it before the interruption can happen.
+```
+
+This is especially important for checkout. If payment succeeds but the client never returns, the backend still has the order reference and can process a webhook or verification request.
+
+On the UI side, the Flutter app exposes order status, payment history, purchased looks, and tracking pages. Those screens should be driven by backend state rather than local assumptions.
+
+The broader lesson is that mobile systems should be designed around interruption as the default, not the exception.
+
+Interrupted workflows need:
+
+- Durable backend state
+- Local cache for responsiveness
+- Pending operation queues
+- Idempotent backend mutations
+- Conflict handling
+- Startup recovery
+- Provider verification for payments
+
+The Event-to-Outfit platform uses those patterns across recommendation, bag, checkout, and payment flows. That is why the app can feel continuous even when the user's session is not.

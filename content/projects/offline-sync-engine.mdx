@@ -1,0 +1,35 @@
+---
+title: Stateful Mobile Experience
+summary: Backend-driven UI system with persistent state restoration across app restarts, powered by a custom JSON-schema transformation layer.
+year: 2025
+tags:
+  - Mobile Dev
+  - UX Logic
+  - JSON Schema
+  - Persistent State
+featured: true
+role: Mobile Dev / UX Logic
+metrics:
+  - label: Update mode
+    value: Server-driven
+  - label: Recovery
+    value: App restarts
+  - label: Delivery
+    value: No binary gate
+---
+
+## What it solves
+
+This system keeps state alive across app restarts while allowing application layouts and interaction models to evolve without waiting for app store releases.
+
+## Core approach
+
+The architecture uses a backend-driven UI layer with persistent state restoration. A transformation pipeline converts remote JSON schema into local component trees and synchronizes user state back into durable storage.
+
+## Why it matters
+
+By decoupling UI components from hardcoded client logic, the system enables instant iterations. The server dictates not only the data, but also layout, visibility, and interaction models for globally consistent behavior.
+
+## Result
+
+The result is a stateful mobile experience that survives interruption gracefully, updates quickly, and keeps product logic aligned across clients.

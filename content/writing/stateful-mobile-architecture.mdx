@@ -1,0 +1,12 @@
+---
+title: "Why payment flows fail: A study on idempotency"
+summary: A deep dive into why payment systems break under retries, duplicate callbacks, and client uncertainty, and how idempotency keys restore order.
+publishedAt: 2025-02-14
+tags:
+  - Payments
+  - Idempotency
+  - Reliability
+featured: true
+---
+
+Payment flows often fail because multiple systems believe they are each the owner of truth. Idempotency matters because it turns retries into continuations of the same intent instead of accidental duplicates that create new ambiguity.

@@ -1,0 +1,53 @@
+---
+title: When Rules Beat AI
+summary: A hybrid recommendation system where AI handles semantic understanding while rules and business constraints enforce deterministic product behavior.
+publishedAt: 2026-03-05
+tags:
+  - AI
+  - Rules Engine
+  - Constraints
+  - Backend
+featured: true
+---
+
+AI is powerful, but real products rarely succeed with AI alone.
+
+In the Event-to-Outfit platform, AI helps with semantic matching, image generation, and flexible interpretation. But some decisions are better handled by rules.
+
+This is especially true in fashion recommendation, where the system has to handle cultural expectations, weather constraints, formality, time of day, business requirements, and inventory limits.
+
+The backend combines three layers:
+
+```text
+AI
+    + Rule Engine
+    + Business Constraints
+```
+
+The rule layer is visible in the backend data files under `data/rules`. These include weather rules, time rules, style rules, formality rules, event types, event keywords, context rules, and cultural overrides. The classifier in `api/outfits/outfit_rules.py` reads active rules and produces a stable context payload for the recommendation engine.
+
+This is a good example of when rules beat AI.
+
+If an event is culturally specific, the system should not rely only on a model's interpretation. A Yoruba wedding, Igbo traditional event, Hausa event, cultural festival, or formal Nigerian celebration can have expectations that should be explicitly represented. Cultural override rules give the system deterministic behavior for those cases.
+
+Weather is another place where rules matter. If rain is likely, the system needs to consider outerwear, footwear, fabric, and practicality. That is not a creative writing problem. It is a constraint problem.
+
+Formality also benefits from rules. A business event, black-tie event, religious ceremony, or casual hangout should map to different outfit expectations. AI can help interpret the event text, but the final decision should respect known product rules.
+
+The classification engine in `classify_event_v5` follows this pattern. It classifies the event with rule sets, identifies culture hints, resolves location and time context, applies cultural overrides, calculates formality, and returns a stable set of keys for the rest of the pipeline.
+
+AI still has an important role. The system uses embeddings for concept resolution, comparing event text against stored concepts so it can understand meaning beyond exact keywords. AI is also used in the broader outfit generation and rationale flow.
+
+But AI is not responsible for everything.
+
+That is the point.
+
+Most real systems need both flexible intelligence and deterministic constraints. AI helps the system understand ambiguous language. Rules help the system behave predictably when the product has clear requirements.
+
+This hybrid approach also makes the system easier to maintain. If a cultural override needs to change, it can be updated in the rules data. If weather logic needs to be adjusted, that can be handled explicitly. If business priorities change, scoring and rule weights can evolve without rewriting the entire AI layer.
+
+On the Flutter side, this hybrid backend allows the app to present recommendations as a reliable product experience rather than a pure AI demo. The client receives structured outfit options, explanations, weather information, and recommendation metadata that it can render consistently.
+
+The lesson is not that rules are better than AI in every situation. The lesson is that rules are better for decisions that must be consistent, auditable, and aligned with product constraints.
+
+In real engineering systems, AI should not replace rules. It should work with them.

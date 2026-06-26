@@ -1,0 +1,52 @@
+---
+title: Building Context-Aware Recommendation Systems
+summary: A layered recommendation pipeline that combines profile signals, event context, weather, embeddings, scoring, and backend-owned decision logic.
+publishedAt: 2026-03-01
+tags:
+  - Recommendations
+  - Personalization
+  - Flutter
+  - FastAPI
+featured: true
+---
+
+Most recommendation systems become useful only when they understand context.
+
+In a fashion product, "recommend an outfit" is not a simple matching problem. A useful recommendation needs to know who the user is, where they are going, what the weather will be like, what the occasion expects, what cultural rules may apply, and what inventory is actually available.
+
+That is the problem the Event-to-Outfit platform solves.
+
+The backend under `Event to Outfit/event2outfit_modular_fastapi` is designed around a layered recommendation pipeline. The Flutter app under `style` collects user preferences and event details, then sends those signals to the backend, where recommendation logic turns them into outfit options.
+
+The core recommendation flow looks like this:
+
+```text
+User Profile
+    -> Event Context
+    -> Weather Resolution
+    -> Classification
+    -> Concept Matching
+    -> Item Scoring
+    -> Outfit Composition
+    -> Client Experience
+```
+
+The user profile contributes signals such as preferred styles, color likes, color avoids, comfort level, modesty preference, heel avoidance, supportive shoe needs, budget range, sustainability preference, and willingness to try new styles. These are captured during onboarding in the Flutter app and represented in the app domain model.
+
+The event contributes another layer of meaning. A wedding, birthday dinner, business meeting, cultural festival, or casual outing should not be treated the same way. The backend uses `classify_event_v5` in `api/outfits/outfit_rules.py` to classify the event into a stable context payload. That classification includes formality, time, weather category, culture hint, event type, event category, and outfit recommendation hints.
+
+Weather is not decorative in this system. It changes the recommendation. The backend resolves event weather through `api/outfits/weather_service.py`, using location and event time to build a weather snapshot. That data becomes part of the recommendation context, influencing fabric, layering, footwear, and comfort choices.
+
+Once the system understands the event, it resolves a styling concept. The backend uses concept embeddings, including `text-embedding-3-small`, to compare event text against stored concepts. This lets the system match a user's event description to a broader style concept rather than relying only on exact keyword matches.
+
+From there, item scoring happens in `score_item_v4` inside `api/outfits/outfit_engine.py`. This is where the system becomes truly personalized. Clothing items are scored against culture, region, formality, weather suitability, temperature band, color family, user color preferences, occasion tags, style affinity, modesty, footwear constraints, budget, sustainability, and comfort.
+
+The important engineering decision is that the system does not rely on a single model call to produce a result. It uses AI where semantic understanding helps, rules where deterministic behavior matters, and scoring logic where many signals need to be balanced.
+
+On the frontend, `OutfitDataBloc` manages the user-facing flow. It handles outfit generation, shuffle requests, accepted outfits, cached outfits, featured outfits, and event-linked recommendations. The UI can display outfit cards, rationale text, weather details, and recovery state without knowing every backend decision that produced the recommendation.
+
+That separation matters. The mobile app stays focused on experience. The backend owns recommendation truth.
+
+The result is a recommendation system that is useful in real situations. It can adapt to user taste, respond to weather, respect cultural context, and still generate options when the available data is imperfect.
+
+The main lesson is this: real recommendation systems are not just about predicting what a user might like. They are about combining preference, context, constraints, and available inventory into a decision the user can trust.

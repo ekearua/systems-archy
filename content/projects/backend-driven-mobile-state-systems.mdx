@@ -1,0 +1,40 @@
+---
+title: Backend-Driven Mobile State Systems
+summary: Durable outfit, shopping bag, and mutation state that survives app termination, offline gaps, repeated actions, and device transitions.
+year: 2025
+tags:
+  - FastAPI
+  - Flutter
+  - Persistence
+  - Offline Replay
+featured: true
+role: Mobile State Architecture
+metrics:
+  - label: Authority
+    value: Backend-first
+  - label: Recovery
+    value: Startup-safe
+  - label: Mutations
+    value: Idempotent
+---
+
+## System overview
+
+The state architecture keeps the Flutter experience responsive while preserving backend records as the durable source of truth.
+
+Outfit decisions, generated recommendation snapshots, saved shopping bag selections, and pending mutations are stored in layers with different responsibilities. Local state supports immediate interaction. Backend snapshots support cross-session and cross-device recovery. Idempotency and replay metadata protect repeated or interrupted operations.
+
+## Core implementation
+
+- `OutfitDecisionState` records accepted or rejected outfit decisions with a unique user, event, and outfit identity.
+- `MutationOperation` prevents the same endpoint operation from being processed repeatedly.
+- `SuggestedOutfitSnapshot` stores event and recommendation payloads for later restoration.
+- `accept_outfit_mutation` and `reject_outfit_mutation` update decision state and saved snapshots together.
+- `ShoppingBagSelection` preserves server-side purchase selections across devices.
+- `OutboxLocalDataSource` queues unavailable client mutations.
+- `OutboxReplayWorker` replays pending operations after connectivity returns.
+- `SplashPage` restores saved bag selections and primes cached and backend outfit state during startup.
+
+## Reliability approach
+
+Recovery is a normal execution path, not an exceptional one. The app can render cached state first, replay pending work, reconcile conflicts, and replace local assumptions with backend-confirmed truth without losing the user's intent.
