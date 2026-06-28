@@ -152,7 +152,7 @@ export default async function Home() {
             </h3>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-2">
             {systemsEntries.map((system, index) => (
               <FadeIn key={system.title} delay={0.08 * index}>
                 <Link
