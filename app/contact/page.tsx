@@ -87,16 +87,6 @@ export default function ContactPage() {
               </div>
             </div>
 
-            <div className="glass-card relative hidden h-32 overflow-hidden rounded-xl opacity-60 lg:block">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(183,196,255,0.1),transparent_52%)]" />
-              <div className="p-6 font-mono text-[10px] uppercase leading-tight text-muted">
-                Architecture: ARM64
-                <br />
-                Uptime: 99.98%
-                <br />
-                Latent_Request: [PENDING]
-              </div>
-            </div>
           </div>
 
           <div className="lg:col-span-7">
@@ -171,9 +161,6 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <p className="text-sm italic text-muted">
-                    Direct channels only. No portfolio contact form in the loop.
-                  </p>
                   <a
                     href={`mailto:${siteConfig.contact.email}`}
                     className="inline-flex items-center justify-center gap-3 rounded-lg bg-primary-strong px-10 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(0,82,255,0.15)] transition-all hover:scale-[1.02]"
